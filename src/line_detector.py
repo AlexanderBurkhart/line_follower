@@ -112,10 +112,8 @@ class Line_Detector(object):
             bound = [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]
             #tl=0 tr =1 bl=2 br=3
             points = self.find_corners(rect, bound)
-            #cv2.line(contour_img,(int(points[0][0]),int(points[0][1])),(int(points[1][0]),int(points[1][1])),(0,0,255),5)
             x1,y1,x2,y2 = self.find_tape_direction(points)
             lines.append([x1,y1,x2,y2])
-            #cv2.line(contour_img,(x1,y1),(x2,y2),(255,0,0),5)
         return lines
 
     def draw_lines(self, lines, warped, img):
@@ -134,7 +132,6 @@ img = cv2.imread('../imgs/image0.png')
 
 #width=640 height=480
 img = cv2.resize(img, (1280,720))
-#print(img.shape[1])
 detector = Line_Detector()
 
 cv2.imshow('img', img)
@@ -154,5 +151,3 @@ detect_img = detector.draw_lines(lines, warped, img)
 
 cv2.imshow('detect_line', detect_img)
 cv2.waitKey(0)
-#cv2.imshow('lines', lines)
-#cv2.waitKey(0)
