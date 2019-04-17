@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+from numpy import linalg as LA
 
 class Line_Detector(object):
     def warp(self, img, type):
@@ -68,16 +69,25 @@ class Line_Detector(object):
    
     def filter_contours(self, contours):
         i = 0
-        while(i < len(contours)):
-            contour = contours[i]
+        #while(i < len(contours)):
+        #    contour = contours[i]
             #print("area of contour %f: %f" % (i, cv2.contourArea(contours[i])))
-            if(cv2.contourArea(contour) < 500):
-                contours.pop(i)
-                if(i != 0):
-                    i -= 1
-                continue
-            i += 1
-        return contours
+        #    if(cv2.contourArea(contour) < 500):
+        #        contours.pop(i)
+        #        if(i != 0):
+        #            i -= 1
+        #        continue
+        #    i += 1
+
+        max_contour_area = 0
+        max_idx = -1
+        for i in range(0, len(contours)):
+            contour = contours[i]
+            if(cv2.contourArea(contour) > max_contour_area):
+                max_contour_area = cv2.contourArea(contour)
+                max_idx =  i
+
+        return contours[max_idx]
 
     def find_tape_direction(self, points):
         x1 = 0
@@ -100,35 +110,42 @@ class Line_Detector(object):
     def contours(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         contours, hierarchy = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        filtered_contours = self.filter_contours(contours)
+        filtered_contour = self.filter_contours(contours)
         #contour_img = cv2.drawContours(img, filtered_contours, -1, (0,255,0), 3)
-        return filtered_contours
+        return filtered_contour
 
-    def find_lines(self, contours):
-        lines = []
-        for contour in contours:
-            rect = cv2.minAreaRect(contour)
-            x,y,w,h = cv2.boundingRect(contour)
-            bound = [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]
-            #tl=0 tr =1 bl=2 br=3
-            points = self.find_corners(rect, bound)
-            x1,y1,x2,y2 = self.find_tape_direction(points)
-            lines.append([x1,y1,x2,y2])
-        return lines
+    def find_line(self, contour):
+        rect = cv2.minAreaRect(contour)
+        x,y,w,h = cv2.boundingRect(contour)
+        bound = [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]
+        #tl=0 tr =1 bl=2 br=3
+        points = self.find_corners(rect, bound)
+        x1,y1,x2,y2 = self.find_tape_direction(points)
+        return x1,y1,x2,y2
 
-    def draw_lines(self, lines, warped, img):
+    def find_cte(self, line, img):
+        x1,y1,x2,y2 = line
+        p1 = (x1,y1)
+        p1 = np.asarray(p1)
+        p2 = (x2,y2)
+        p2 = np.asarray(p2)
+        #print(img.shape[0])
+        p3 = (img.shape[0]/2, img.shape[1])
+        p3 = np.asarray(p3)
+        return np.cross(p2-p1,p3-p1)/LA.norm(p2-p1)
+
+    def draw_line(self, line, warped, img):
         blank_warped = np.zeros((img.shape[1], img.shape[0], 3), np.uint8)
-        for line in lines:
-            x1,y1,x2,y2 = line
-            cv2.line(blank_warped,(x1,y1),(x2,y2),(255,0,0),5)
+        x1,y1,x2,y2 = line
+        cv2.line(blank_warped,(x1,y1),(x2,y2),(255,0,0),5)
         Minv = self.warp(blank_warped, 1)
         newwarp = cv2.warpPerspective(blank_warped, Minv, (img.shape[1], img.shape[0]))
 
         result = cv2.addWeighted(newwarp, 1, img, 0.4, 0)
         return result
-        
 
-img = cv2.imread('../imgs/image0.png')
+
+img = cv2.imread('../imgs/image1.png')
 
 #width=640 height=480
 img = cv2.resize(img, (1280,720))
@@ -144,10 +161,11 @@ imgThresh = detector.colorSpace(warped)
 #cv2.imshow('thresh', imgThresh)
 #cv2.waitKey(0)
 
-contours = detector.contours(imgThresh)
-lines = detector.find_lines(contours)
+contour = detector.contours(imgThresh)
+line = detector.find_line(contour)
 
-detect_img = detector.draw_lines(lines, warped, img)
+detect_img = detector.draw_line(line, warped, img)
 
 cv2.imshow('detect_line', detect_img)
+print(detector.find_cte(line, detect_img))
 cv2.waitKey(0)
