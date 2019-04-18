@@ -26,6 +26,6 @@ class PID(object):
 		self.p_error = cte
 		self.i_error = self.add_i(cte*dt)
 
-	def total_error(self, speed):
-		return (self.Kp - 0.0032*speed)*self.p_error + self.Ki*self.i_error + (self.Kd + 0.0002*speed)*self.d_error
+	def total_error(self):
+		return self.Kp*self.p_error + self.Ki*self.i_error + self.Kd*self.d_error
 
