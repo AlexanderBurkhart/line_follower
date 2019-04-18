@@ -5,10 +5,10 @@ from numpy import linalg as LA
 
 class Line_Detector(object):
     def warp(self, img, type):
-        src = np.float32([[400, 320],
-                          [870, 320],
-                          [320, 650],
-                          [960, 650]])
+        src = np.float32([[450, 320],
+                          [920, 320],
+                          [370, 650],
+                          [910, 650]])
 
         dst = np.float32([[0, 0],
                           [450, 0],
@@ -41,12 +41,21 @@ class Line_Detector(object):
 
     def colorSpace(self, img):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        
-        lower_white = np.array([0,0,100], dtype=np.uint8)
-        upper_white = np.array([0,0,255], dtype=np.uint8)
+ 
+        #hsv
+        sens = 80
+        lower_white = np.array([0,0,255-sens], dtype=np.uint8)
+        upper_white = np.array([255,sens,255], dtype=np.uint8)
 
         mask = cv2.inRange(hsv, lower_white, upper_white)
         res = cv2.bitwise_and(img, img, mask=mask)
+
+        lower_white = np.array([230,230,230], dtype=np.uint8)
+        upper_white = np.array([255,255,255], dtype=np.uint8)
+
+        mask = cv2.inRange(res, lower_white, upper_white)
+        res = cv2.bitwise_and(res, res, mask=mask)
+
         return res
 
     def calc_distance(self, p1, p2):
@@ -82,23 +91,25 @@ class Line_Detector(object):
     def filter_contours(self, contours):
         if not contours:
             return []
+        min_contour_area = 700
         i = 0
-        max_contour_area = 0
-        max_idx = -1
-        for i in range(0, len(contours)):
+        while(i < len(contours)):
             contour = contours[i]
-            if(cv2.contourArea(contour) > max_contour_area):
-                max_contour_area = cv2.contourArea(contour)
-                max_idx =  i
+            x1,y1,x2,y2 = self.find_line(contour)
+            length = self.calc_distance((x1,y1),(x2,y2))
+            if cv2.contourArea(contour) < min_contour_area or length < 100:
+                contours.pop(i)
+                i -= 1
+            i += 1
 
-        return contours[max_idx]
+        return contours
 
     def find_tape_direction(self, points):
         x1 = 0
         y1 = 0
         x2 = 0 
         y2 = 0
-        if(self.calc_distance(points[0], points[1]) > self.calc_distance(points[0], points[2])):
+        if self.calc_distance(points[0], points[1]) > self.calc_distance(points[0], points[2]):
             x1 = int((points[0][0]+points[2][0])/2)
             y1 = int((points[0][1]+points[2][1])/2)
             x2 = int((points[1][0]+points[3][0])/2)
@@ -114,9 +125,9 @@ class Line_Detector(object):
     def contours(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         contours, hierarchy = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        filtered_contour = self.filter_contours(contours)
+        filtered_contours = self.filter_contours(contours)
         #contour_img = cv2.drawContours(img, filtered_contours, -1, (0,255,0), 3)
-        return filtered_contour
+        return filtered_contours
 
     def find_line(self, contour):
         rect = cv2.minAreaRect(contour)
@@ -126,6 +137,18 @@ class Line_Detector(object):
         points = self.find_corners(rect, bound)
         x1,y1,x2,y2 = self.find_tape_direction(points)
         return x1,y1,x2,y2
+
+    def closest_line(self, contours, img):
+        min_cte = 10000
+        min_idx = -1
+        for i in range(0, len(contours)):
+            contour = contours[i]
+            line = self.find_line(contour)
+            cte = self.calc_cte(line, img)
+            if cte < min_cte:
+                min_cte = cte
+                min_idx = i
+        return self.find_line(contours[min_idx])
 
     def calc_cte(self, line, img):
         x1,y1,x2,y2 = line
@@ -138,32 +161,45 @@ class Line_Detector(object):
         p3 = np.asarray(p3)
         return np.cross(p2-p1,p3-p1)/LA.norm(p2-p1)
 
-    def find_cte(self, img):
-        img = cv2.resize(img, (1280,720))
+    def detect_line(self, img, type):
+        #img = self.increase_brightness(img, value=20)
         warped = self.warp(img, 0)
         imgThresh = self.colorSpace(warped)
 
-        contour = self.contours(imgThresh)
-        if len(contour) == 0:
+#        cv2.imshow('thresh', imgThresh)
+
+        contours = self.contours(imgThresh)
+        if len(contours) == 0:
+            if type == 1:
+                return None, None
             return None
 
-        line = self.find_line(contour)
+        line = self.closest_line(contours, img)
+
+        if type==1:
+            return line, warped
+
+        return line
+
+    def find_cte(self, img):
+        img = cv2.resize(img, (1280,720))
+        line = self.detect_line(img, 0)
+
+        if line == None:
+            return None
 
         return self.calc_cte(line, img)
 
-    def visualize(self, img):
+    def visualize(self, img): 
         img = cv2.resize(img, (1280,720))
-        img = self.increase_brightness(img, value=20)
-        warped = self.warp(img, 0)
-        imgThresh = self.colorSpace(warped)
+        line, warped = self.detect_line(img, 1)
 
-        contour = self.contours(imgThresh)
-        if len(contour) == 0:
+        if line == None:
             return img
 
-        line = self.find_line(contour)
-
         detect_img = self.draw_line(line, warped, img)
+
+        #print('cte: %f' % self.calc_cte(line, img))
 
         return detect_img
 
