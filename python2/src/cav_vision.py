@@ -129,7 +129,7 @@ class Line_Detector(object):
 
     def contours(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        contours, hierarchy = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, hierarchy = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         filtered_contours = self.filter_contours(contours)
         #contour_img = cv2.drawContours(img, filtered_contours, -1, (0,255,0), 3)
         return filtered_contours
@@ -225,5 +225,7 @@ if __name__ == "__main__":
         if not grabbed:
             break
         cte = detector.find_cte(frame)
+        if cte == None:
+            cte = 0
         sd.putNumber('cte', cte)
 
