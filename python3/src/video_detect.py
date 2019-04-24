@@ -1,7 +1,9 @@
 import cv2
 from line_detector import Line_Detector
 
-video = cv2.VideoCapture("../vid/test_video.mp4")
+#video = cv2.VideoCapture("../vid/test_video.mp4")
+video = cv2.VideoCapture(0)
+
 
 detector = Line_Detector()
 
