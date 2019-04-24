@@ -43,7 +43,7 @@ class Line_Detector(object):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
-    def color_space(self, img):
+    def colorSpace(self, img):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
  
         #hsv
@@ -54,7 +54,6 @@ class Line_Detector(object):
         mask = cv2.inRange(hsv, lower_white, upper_white)
         res = cv2.bitwise_and(img, img, mask=mask)
 
-        #rgb
         lower_white = np.array([230,230,230], dtype=np.uint8)
         upper_white = np.array([255,255,255], dtype=np.uint8)
 
@@ -129,7 +128,7 @@ class Line_Detector(object):
 
     def contours(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, contours, hierarchy = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(gray, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         filtered_contours = self.filter_contours(contours)
         #contour_img = cv2.drawContours(img, filtered_contours, -1, (0,255,0), 3)
         return filtered_contours
@@ -156,19 +155,20 @@ class Line_Detector(object):
         return self.find_line(contours[min_idx])
 
     def calc_cte(self, line, img):
-        x1,y1,x2,y2 = line
-        p1 = (x1,y1)
-        p1 = np.asarray(p1)
-        p2 = (x2,y2)
-        p2 = np.asarray(p2)
-        #print(img.shape[0])
-        p3 = (img.shape[0]/2, img.shape[1])
-        p3 = np.asarray(p3)
-        return np.cross(p2-p1,p3-p1)/LA.norm(p2-p1)
+        x1,y1,x2,y2 = line        
+
+        mid_p = [225, 450]
+
+        dist = -(((y2-y1)*mid_p[0] - (x2-x1)*mid_p[1] + x2*y1 - y2*x1)/math.sqrt((y2-y1)**2 + (x2-x1)**2)) 
+
+        return dist
 
     def detect_line(self, img, type):
+        #img = self.increase_brightness(img, value=20)
         warped = self.warp(img, 0)
-        imgThresh = self.color_space(warped)
+        imgThresh = self.colorSpace(warped)
+
+#        cv2.imshow('thresh', imgThresh)
 
         contours = self.contours(imgThresh)
         if len(contours) == 0:
@@ -185,12 +185,12 @@ class Line_Detector(object):
 
     def find_cte(self, img):
         img = cv2.resize(img, (1280,720))
-        line = self.detect_line(img, 0)
+        line, warped = self.detect_line(img, 1)
 
         if line == None:
             return None
 
-        return self.calc_cte(line, img)
+        return self.calc_cte(line, warped)
 
     def visualize(self, img): 
         img = cv2.resize(img, (1280,720))
@@ -201,7 +201,7 @@ class Line_Detector(object):
 
         detect_img = self.draw_line(line, warped, img)
 
-        #print('cte: %f' % self.calc_cte(line, img))
+        print('cte: %f' % self.calc_cte(line, warped))
 
         return detect_img
 
